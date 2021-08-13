@@ -253,13 +253,22 @@ xMBRTUReceiveFSM( void )
          * receiver is in the state STATE_RX_RECEIVCE.
          */
     case STATE_RX_IDLE:
+#if (!USING_MODBUS_DMA)
         usRcvBufferPos = 0;
         ucRTUBuf[usRcvBufferPos++] = ucByte;
+#endif
         eRcvState = STATE_RX_RCV;
 
+#if (!USING_MODBUS_DMA)
         /* Enable t3.5 timers. */
         vMBPortTimersEnable(  );
         break;
+#else
+    #if (MB_SER_PDU_SIZE_MAX != RTU_BUF_SIZE)
+        #error "In file ./port.h, parameter value 'RTU_BUF_SIZE' does not correspond to 'MB SER PDU SIZE MAX'!"
+    #endif
+        usRcvBufferPos = RcvBuffer_DMA_Size(MB_SER_PDU_SIZE_MAX);
+#endif
 
         /* We are currently receiving a frame. Reset the timer after
          * every character received. If more than the maximum possible
@@ -269,7 +278,9 @@ xMBRTUReceiveFSM( void )
     case STATE_RX_RCV:
         if( usRcvBufferPos < MB_SER_PDU_SIZE_MAX )
         {
+#if (!USING_MODBUS_DMA)
             ucRTUBuf[usRcvBufferPos++] = ucByte;
+#endif
         }
         else
         {
@@ -298,6 +309,9 @@ xMBRTUTransmitFSM( void )
         break;
 
     case STATE_TX_XMIT:
+#if USING_MODBUS_DMA
+        usSndBufferCount = 0;
+#endif
         /* check if we are finished. */
         if( usSndBufferCount != 0 )
         {
