@@ -149,7 +149,6 @@ eMBRTUStop( void )
 eMBErrorCode
 eMBRTUReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength )
 {
-    BOOL            xFrameReceived = FALSE;
     eMBErrorCode    eStatus = MB_ENOERR;
 
     ENTER_CRITICAL_SECTION(  );
@@ -171,7 +170,6 @@ eMBRTUReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength )
 
         /* Return the start of the Modbus PDU to the caller. */
         *pucFrame = ( UCHAR * ) & ucRTUBuf[MB_SER_PDU_PDU_OFF];
-        xFrameReceived = TRUE;
     }
     else
     {
@@ -211,6 +209,9 @@ eMBRTUSend( UCHAR ucSlaveAddress, const UCHAR * pucFrame, USHORT usLength )
 
         /* Activate the transmitter. */
         eSndState = STATE_TX_XMIT;
+#if USING_MODBUS_TxDMA
+        SendBuffer_DMA_Size(usSndBufferCount);
+#endif
         vMBPortSerialEnable( FALSE, TRUE );
     }
     else
@@ -253,13 +254,13 @@ xMBRTUReceiveFSM( void )
          * receiver is in the state STATE_RX_RECEIVCE.
          */
     case STATE_RX_IDLE:
-#if (!USING_MODBUS_DMA)
+#if (!USING_MODBUS_RxDMA)
         usRcvBufferPos = 0;
         ucRTUBuf[usRcvBufferPos++] = ucByte;
 #endif
         eRcvState = STATE_RX_RCV;
 
-#if (!USING_MODBUS_DMA)
+#if (!USING_MODBUS_RxDMA)
         /* Enable t3.5 timers. */
         vMBPortTimersEnable(  );
         break;
@@ -278,7 +279,7 @@ xMBRTUReceiveFSM( void )
     case STATE_RX_RCV:
         if( usRcvBufferPos < MB_SER_PDU_SIZE_MAX )
         {
-#if (!USING_MODBUS_DMA)
+#if (!USING_MODBUS_RxDMA)
             ucRTUBuf[usRcvBufferPos++] = ucByte;
 #endif
         }
@@ -309,7 +310,7 @@ xMBRTUTransmitFSM( void )
         break;
 
     case STATE_TX_XMIT:
-#if USING_MODBUS_DMA
+#if USING_MODBUS_TxDMA
         usSndBufferCount = 0;
 #endif
         /* check if we are finished. */
